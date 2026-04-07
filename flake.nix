@@ -1,0 +1,63 @@
+{
+  description = "Development environment for Arabic-English audio transcription with speaker diarization";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+  };
+
+  outputs = { self, nixpkgs }:
+    let
+      pkgs = import nixpkgs { system = "x86_64-linux"; };
+    in
+    {
+      devShells.x86_64-linux.default = pkgs.mkShell {
+        packages = [
+          pkgs.python311
+          (pkgs.python311.withPackages (ps: with ps; [
+            torch
+            torchvision
+            torchaudio
+            faster-whisper
+            pyannote-audio
+            pyannote-core
+            pyannote-database
+            pyannote-metrics
+            pyannote-pipeline
+            soundfile
+            librosa
+            numpy
+            scipy
+            huggingface-hub
+            progress
+            semver
+            pyyaml
+          ]))
+
+          pkgs.ffmpeg
+          pkgs.libsndfile
+          pkgs.portaudio
+          pkgs.sox
+        ];
+
+        shellHook = ''
+          echo "=========================================="
+          echo "Arabic-English Audio Transcription Shell"
+          echo "=========================================="
+          echo ""
+          echo "Available packages:"
+          echo "  - Python: $(python --version)"
+          echo "  - torch: $(python -c 'import torch; print(torch.__version__)')"
+          echo "  - faster-whisper: $(python -c 'import faster_whisper; print(faster_whisper.__version__)')"
+          echo "  - pyannote.audio: $(python -c 'import pyannote; print(pyannote.__version__)')"
+          echo "  - ffmpeg: $(ffmpeg -version | head -1)"
+          echo ""
+          echo "Required environment variables:"
+          echo "  - HF_TOKEN: HuggingFace token for model access"
+          echo ""
+          echo "Usage:"
+          echo "  python transcribe.py <audio_file>"
+          echo ""
+        '';
+      };
+    };
+}
