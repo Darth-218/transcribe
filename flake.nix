@@ -2,10 +2,11 @@
   description = "Development environment for Arabic-English audio transcription with speaker diarization";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
   };
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       pkgs = import nixpkgs { system = "x86_64-linux"; };
     in
@@ -13,25 +14,27 @@
       devShells.x86_64-linux.default = pkgs.mkShell {
         packages = [
           pkgs.python311
-          (pkgs.python311.withPackages (ps: with ps; [
-            torch
-            torchvision
-            torchaudio
-            faster-whisper
-            pyannote-audio
-            pyannote-core
-            pyannote-database
-            pyannote-metrics
-            pyannote-pipeline
-            soundfile
-            librosa
-            numpy
-            scipy
-            huggingface-hub
-            progress
-            semver
-            pyyaml
-          ]))
+          (pkgs.python311.withPackages (
+            ps: with ps; [
+              torch
+              torchvision
+              torchaudio
+              faster-whisper
+              pyannote-audio
+              pyannote-core
+              pyannote-database
+              pyannote-metrics
+              pyannote-pipeline
+              soundfile
+              librosa
+              numpy
+              scipy
+              huggingface-hub
+              progress
+              semver
+              pyyaml
+            ]
+          ))
 
           pkgs.ffmpeg
           pkgs.libsndfile
@@ -61,3 +64,4 @@
       };
     };
 }
+
