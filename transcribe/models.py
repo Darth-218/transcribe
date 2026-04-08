@@ -9,6 +9,11 @@ DEFAULT_MODEL = "oddadmix/MasriSwitch-Gemma3n-Transcriber-v1"
 FALLBACK_MODEL = "MohamedRashad/Arabic-Whisper-CodeSwitching-Edition"
 DEFAULT_MODELS_DIR = "./models"
 
+WHISPER_REQUIRED_FILES = [
+    "config.json",
+    "tokenizer.json",
+]
+
 
 def get_device() -> str:
     """Determine whether to use CUDA or CPU."""
@@ -19,6 +24,20 @@ def get_device() -> str:
     except Exception:
         pass
     return "cpu"
+
+
+def get_whisper_model_files(models_path: Path) -> list:
+    """Get all Whisper model files (both .bin and .safetensors).
+    
+    Args:
+        models_path: Path to model directory
+    
+    Returns:
+        List of model file paths
+    """
+    bin_files = list(models_path.glob("*.bin"))
+    safetensors_files = list(models_path.glob("*.safetensors"))
+    return bin_files + safetensors_files
 
 
 def find_local_model(model_id: str, models_dir: str = DEFAULT_MODELS_DIR) -> Optional[Path]:
@@ -35,10 +54,18 @@ def find_local_model(model_id: str, models_dir: str = DEFAULT_MODELS_DIR) -> Opt
     local_name = model_id.replace("/", "_")
     local_path = models_path / "whisper" / local_name
     
-    if local_path.exists() and list(local_path.glob("*.bin")):
-        return local_path
+    if not local_path.exists() or not local_path.is_dir():
+        return None
     
-    return None
+    for required_file in WHISPER_REQUIRED_FILES:
+        if not (local_path / required_file).exists():
+            return None
+    
+    model_files = get_whisper_model_files(local_path)
+    if not model_files:
+        return None
+    
+    return local_path
 
 
 def load_whisper_model(

@@ -35,18 +35,21 @@
 
         shellHook = ''
           # Check and download models if needed
-          if [ ! -d "models/whisper" ] || [ ! -d "models/pyannote" ]; then
-            if [ -n "$HF_TOKEN" ]; then
+          if [ -n "$HF_TOKEN" ]; then
+            python -c "from transcribe.download import check_models_exist; import sys; sys.exit(0 if check_models_exist('./models') else 1)" || (
               echo "=========================================="
               echo "Models not found. Downloading..."
               echo "=========================================="
               python -c "from transcribe.download import download_all; download_all('./models', '$HF_TOKEN')"
-            else
+            )
+          else
+            python -c "from transcribe.download import check_models_exist; import sys; sys.exit(0 if check_models_exist('./models') else 1)" || (
               echo "=========================================="
               echo "WARNING: Models not found!"
               echo "Set HF_TOKEN and re-enter to download."
+              echo "Example: export HF_TOKEN=your_token"
               echo "=========================================="
-            fi
+            )
           fi
 
           echo ""
@@ -63,7 +66,7 @@
           echo ""
           echo "Models:"
           echo "  - Location: ./models/"
-          echo "  - Offline ready: $([ -d 'models/whisper' ] && [ -d 'models/pyannote' ] && echo 'Yes' || echo 'No')"
+          python -c "from transcribe.download import check_models_exist; print('  - Offline ready:', 'Yes' if check_models_exist('./models') else 'No')"
           echo ""
           echo "Usage:"
           echo "  python -m transcribe <audio_file>"

@@ -3,11 +3,24 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 DEFAULT_WHISPER_MODEL = "oddadmix/MasriSwitch-Gemma3n-Transcriber-v1"
 DIARIZATION_MODEL = "pyannote/speaker-diarization-3.1"
 SEGMENTATION_MODEL = "pyannote/segmentation-3.0"
+
+WHISPER_REQUIRED_FILES = [
+    "config.json",
+    "tokenizer.json",
+    "model.bin",
+]
+
+WHISPER_OPTIONAL_FILES = [
+    "model.safetensors",
+    "tokenizer_config.json",
+    "vocabulary.json",
+    "preprocessor_config.json",
+]
 
 
 def ensure_models_dir(models_dir: str) -> Path:
@@ -24,6 +37,40 @@ def ensure_models_dir(models_dir: str) -> Path:
     return path
 
 
+def get_whisper_model_files(models_path: Path) -> List[Path]:
+    """Get all Whisper model files (both .bin and .safetensors).
+    
+    Args:
+        models_path: Path to models directory
+    
+    Returns:
+        List of model file paths
+    """
+    bin_files = list(models_path.rglob("*.bin"))
+    safetensors_files = list(models_path.rglob("*.safetensors"))
+    return bin_files + safetensors_files
+
+
+def validate_whisper_model(model_dir: Path) -> bool:
+    """Validate that all required Whisper model files exist.
+    
+    Args:
+        model_dir: Path to model directory
+    
+    Returns:
+        True if model is valid, False otherwise
+    """
+    if not model_dir.exists() or not model_dir.is_dir():
+        return False
+    
+    for required_file in WHISPER_REQUIRED_FILES:
+        if not (model_dir / required_file).exists():
+            return False
+    
+    has_model_file = get_whisper_model_files(model_dir)
+    return len(has_model_file) > 0
+
+
 def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[str] = None):
     """Download Whisper model to local directory.
     
@@ -36,7 +83,7 @@ def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[st
     
     target_dir = Path(models_dir) / "whisper" / model_id.replace("/", "_")
     
-    if target_dir.exists() and (target_dir / "model.bin").exists():
+    if validate_whisper_model(target_dir):
         print(f"Whisper model already exists: {target_dir}", file=sys.stderr)
         return target_dir
     
@@ -44,10 +91,72 @@ def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[st
     
     target_dir.mkdir(parents=True, exist_ok=True)
     
-    model = WhisperModel(model_id, device="cpu", compute_type="int8")
+    try:
+        model = WhisperModel(model_id, device="cpu", compute_type="int8")
+        
+        if validate_whisper_model(target_dir):
+            print(f"Whisper model downloaded to: {target_dir}", file=sys.stderr)
+        else:
+            print(f"Warning: Model downloaded but validation failed", file=sys.stderr)
+        
+        return target_dir
+    except Exception as e:
+        print(f"Error downloading Whisper model: {e}", file=sys.stderr)
+        raise
+
+
+def get_pyannote_model_structure(models_path: Path) -> dict:
+    """Get pyannote model subdirectory structure.
     
-    print(f"Whisper model downloaded to: {target_dir}", file=sys.stderr)
-    return target_dir
+    Args:
+        models_path: Path to pyannote models directory
+    
+    Returns:
+        Dict with model names and their paths
+    """
+    structure = {}
+    
+    if not models_path.exists():
+        return structure
+    
+    for item in models_path.iterdir():
+        if item.is_dir():
+            structure[item.name] = item
+    
+    return structure
+
+
+def validate_pyannote_models(models_dir: str) -> bool:
+    """Validate that pyannote models are properly downloaded.
+    
+    Args:
+        models_dir: Path to models directory
+    
+    Returns:
+        True if pyannote models are valid
+    """
+    pyannote_dir = Path(models_dir) / "pyannote"
+    
+    if not pyannote_dir.exists():
+        return False
+    
+    structure = get_pyannote_model_structure(pyannote_dir)
+    
+    required_models = [
+        "segmentation-3.0",
+        "speaker-diarization-3.1"
+    ]
+    
+    for model_name in required_models:
+        if model_name not in structure:
+            return False
+        
+        model_path = structure[model_name]
+        
+        if not any(model_path.iterdir()):
+            return False
+    
+    return True
 
 
 def download_pyannote_models(models_dir: str, hf_token: str):
@@ -61,7 +170,7 @@ def download_pyannote_models(models_dir: str, hf_token: str):
     
     target_dir = Path(models_dir) / "pyannote"
     
-    if target_dir.exists() and (target_dir / "speaker-diarization-3.1").exists():
+    if validate_pyannote_models(models_dir):
         print(f"Pyannote models already exist: {target_dir}", file=sys.stderr)
         return target_dir
     
@@ -70,26 +179,36 @@ def download_pyannote_models(models_dir: str, hf_token: str):
     target_dir.mkdir(parents=True, exist_ok=True)
     
     try:
+        segmentation_dir = target_dir / "segmentation-3.0"
+        segmentation_dir.mkdir(parents=True, exist_ok=True)
+        
         snapshot_download(
             SEGMENTATION_MODEL,
-            cache_dir=str(target_dir / "segmentation"),
-            local_dir=str(target_dir / "segmentation-3.0"),
+            local_dir=str(segmentation_dir),
             token=hf_token,
         )
+        print(f"Downloaded segmentation model", file=sys.stderr)
     except Exception as e:
         print(f"Warning: Could not download segmentation model: {e}", file=sys.stderr)
     
     try:
+        diarization_dir = target_dir / "speaker-diarization-3.1"
+        diarization_dir.mkdir(parents=True, exist_ok=True)
+        
         snapshot_download(
             DIARIZATION_MODEL,
-            cache_dir=str(target_dir / "diarization"),
-            local_dir=str(target_dir / "speaker-diarization-3.1"),
+            local_dir=str(diarization_dir),
             token=hf_token,
         )
+        print(f"Downloaded diarization model", file=sys.stderr)
     except Exception as e:
         print(f"Warning: Could not download diarization model: {e}", file=sys.stderr)
     
-    print(f"Pyannote models downloaded to: {target_dir}", file=sys.stderr)
+    if validate_pyannote_models(models_dir):
+        print(f"Pyannote models downloaded to: {target_dir}", file=sys.stderr)
+    else:
+        print(f"Warning: Pyannote models downloaded but validation failed", file=sys.stderr)
+    
     return target_dir
 
 
@@ -105,11 +224,10 @@ def check_models_exist(models_dir: str) -> bool:
     models_path = Path(models_dir)
     
     whisper_dir = models_path / "whisper"
-    if not whisper_dir.exists() or not list(whisper_dir.rglob("*.bin")):
+    if not validate_whisper_model(whisper_dir):
         return False
     
-    pyannote_dir = models_path / "pyannote"
-    if not pyannote_dir.exists():
+    if not validate_pyannote_models(models_dir):
         return False
     
     return True

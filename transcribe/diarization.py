@@ -20,10 +20,20 @@ def find_local_pyannote_model(models_dir: str = DEFAULT_MODELS_DIR) -> Optional[
     """
     models_path = Path(models_dir) / "pyannote"
     
-    if models_path.exists() and models_path.is_dir():
-        return models_path
+    if not models_path.exists() or not models_path.is_dir():
+        return None
     
-    return None
+    required_dirs = [
+        "segmentation-3.0",
+        "speaker-diarization-3.1"
+    ]
+    
+    for dir_name in required_dirs:
+        dir_path = models_path / dir_name
+        if not dir_path.exists() or not any(dir_path.iterdir()):
+            return None
+    
+    return models_path
 
 
 def load_diarization_pipeline(
@@ -50,19 +60,27 @@ def load_diarization_pipeline(
     
     if local_models:
         print(f"Using local pyannote models: {local_models}", file=sys.stderr)
-        try:
-            pipeline = Pipeline.from_pretrained(
-                model_name,
-                cache_dir=str(local_models)
-            )
-            
-            if torch.cuda.is_available():
-                pipeline.to(torch.device("cuda"))
-            
-            return pipeline
-        except Exception as e:
-            print(f"Failed to load local pyannote models: {e}", file=sys.stderr)
-            print("Trying online mode...", file=sys.stderr)
+        
+        diarization_dir = local_models / "speaker-diarization-3.1"
+        segmentation_dir = local_models / "segmentation-3.0"
+        
+        if diarization_dir.exists() and segmentation_dir.exists():
+            try:
+                pipeline = Pipeline.from_pretrained(
+                    "pyannote/speaker-diarization-3.1",
+                    local_files_only=True,
+                    local_dir=str(diarization_dir)
+                )
+                
+                if torch.cuda.is_available():
+                    pipeline.to(torch.device("cuda"))
+                
+                return pipeline
+            except Exception as e:
+                print(f"Failed to load local pyannote models: {e}", file=sys.stderr)
+                print("Trying online mode...", file=sys.stderr)
+        else:
+            print(f"Local pyannote models incomplete, trying online...", file=sys.stderr)
     
     if not hf_token:
         print("Error: HF_TOKEN required for online model download", file=sys.stderr)
