@@ -2,7 +2,7 @@
   description = "Development environment for Arabic-English audio transcription with speaker diarization";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
   };
 
   outputs =
@@ -21,25 +21,16 @@
               torchaudio
               faster-whisper
               pyannote-audio
-              pyannote-core
-              pyannote-database
-              pyannote-metrics
-              pyannote-pipeline
               soundfile
               librosa
               numpy
               scipy
               huggingface-hub
-              progress
-              semver
-              pyyaml
             ]
           ))
 
           pkgs.ffmpeg
           pkgs.libsndfile
-          pkgs.portaudio
-          pkgs.sox
         ];
 
         shellHook = ''
@@ -58,10 +49,9 @@
           echo "  - HF_TOKEN: HuggingFace token for model access"
           echo ""
           echo "Usage:"
-          echo "  python transcribe.py <audio_file>"
+          echo "  python -m transcribe <audio_file>"
           echo ""
         '';
       };
     };
 }
-
