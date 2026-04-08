@@ -42,7 +42,7 @@
           echo "  - Python: $(python --version)"
           echo "  - torch: $(python -c 'import torch; print(torch.__version__)')"
           echo "  - faster-whisper: $(python -c 'import faster_whisper; print(faster_whisper.__version__)')"
-          echo "  - pyannote.audio: $(python -c 'import pyannote; print(pyannote.__version__)')"
+          echo "  - pyannote.audio: $(python -c 'import pyannote.audio; print(pyannote.audio.__version__ if hasattr(pyannote.audio, "__version__") else "installed")')"
           echo "  - ffmpeg: $(ffmpeg -version | head -1)"
           echo ""
           echo "Required environment variables:"
