@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_MODEL = "oddadmix/MasriSwitch-Gemma3n-Transcriber-v1"
-FALLBACK_MODEL = "MohamedRashad/Arabic-Whisper-CodeSwitching-Edition"
+DEFAULT_MODEL = "whisper-large-v3"
+FALLBACK_MODEL = "whisper-medium"
 DEFAULT_MODELS_DIR = "./models"
 
 WHISPER_REQUIRED_FILES = [

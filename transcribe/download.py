@@ -5,17 +5,17 @@ import sys
 from pathlib import Path
 from typing import Optional, List
 
-DEFAULT_WHISPER_MODEL = "oddadmix/MasriSwitch-Gemma3n-Transcriber-v1"
+DEFAULT_WHISPER_MODEL = "whisper-large-v3"
 DIARIZATION_MODEL = "pyannote/speaker-diarization-3.1"
 SEGMENTATION_MODEL = "pyannote/segmentation-3.0"
 
 WHISPER_REQUIRED_FILES = [
     "config.json",
     "tokenizer.json",
-    "model.bin",
 ]
 
 WHISPER_OPTIONAL_FILES = [
+    "model.bin",
     "model.safetensors",
     "tokenizer_config.json",
     "vocabulary.json",
@@ -74,12 +74,14 @@ def validate_whisper_model(model_dir: Path) -> bool:
 def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[str] = None):
     """Download Whisper model to local directory.
     
+    Uses huggingface_hub snapshot_download to properly download all model files.
+    
     Args:
         model_id: HuggingFace model ID (e.g., "oddadmix/MasriSwitch-Gemma3n-Transcriber-v1")
         models_dir: Target directory for models
         hf_token: HuggingFace token for gated models
     """
-    from faster_whisper import WhisperModel
+    from huggingface_hub import snapshot_download
     
     target_dir = Path(models_dir) / "whisper" / model_id.replace("/", "_")
     
@@ -92,10 +94,16 @@ def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[st
     target_dir.mkdir(parents=True, exist_ok=True)
     
     try:
-        model = WhisperModel(model_id, device="cpu", compute_type="int8")
+        snapshot_download(
+            repo_id=model_id,
+            local_dir=str(target_dir),
+            token=hf_token,
+            ignore_patterns=["*.md", "*.txt", ".github/*"]
+        )
         
         if validate_whisper_model(target_dir):
             print(f"Whisper model downloaded to: {target_dir}", file=sys.stderr)
+            _list_model_files(target_dir)
         else:
             print(f"Warning: Model downloaded but validation failed", file=sys.stderr)
         
@@ -103,6 +111,14 @@ def download_whisper_model(model_id: str, models_dir: str, hf_token: Optional[st
     except Exception as e:
         print(f"Error downloading Whisper model: {e}", file=sys.stderr)
         raise
+
+
+def _list_model_files(model_dir: Path):
+    """List all files in the model directory for debugging."""
+    print(f"Model files in {model_dir}:", file=sys.stderr)
+    for f in sorted(model_dir.iterdir()):
+        size = f.stat().st_size if f.is_file() else 0
+        print(f"  {f.name}: {size} bytes", file=sys.stderr)
 
 
 def get_pyannote_model_structure(models_path: Path) -> dict:
@@ -183,9 +199,10 @@ def download_pyannote_models(models_dir: str, hf_token: str):
         segmentation_dir.mkdir(parents=True, exist_ok=True)
         
         snapshot_download(
-            SEGMENTATION_MODEL,
+            repo_id=SEGMENTATION_MODEL,
             local_dir=str(segmentation_dir),
             token=hf_token,
+            ignore_patterns=["*.md", "*.txt", ".github/*"]
         )
         print(f"Downloaded segmentation model", file=sys.stderr)
     except Exception as e:
@@ -196,9 +213,10 @@ def download_pyannote_models(models_dir: str, hf_token: str):
         diarization_dir.mkdir(parents=True, exist_ok=True)
         
         snapshot_download(
-            DIARIZATION_MODEL,
+            repo_id=DIARIZATION_MODEL,
             local_dir=str(diarization_dir),
             token=hf_token,
+            ignore_patterns=["*.md", "*.txt", ".github/*"]
         )
         print(f"Downloaded diarization model", file=sys.stderr)
     except Exception as e:
