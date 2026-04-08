@@ -52,3 +52,6 @@ Thumbs.db
 
 # Model caches (optional - uncomment if you want to exclude downloaded models)
 # .cache/huggingface/
+
+# Local models directory
+models/

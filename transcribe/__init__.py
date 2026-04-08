@@ -14,6 +14,7 @@ from transcribe.models import (
     load_whisper_with_fallback,
     DEFAULT_MODEL,
     FALLBACK_MODEL,
+    DEFAULT_MODELS_DIR,
 )
 from transcribe.diarization import (
     load_diarization_pipeline,
@@ -34,6 +35,11 @@ from transcribe.output import (
     format_transcript,
     save_transcript,
     get_output_path,
+)
+from transcribe.download import (
+    download_all,
+    check_models_exist,
+    DEFAULT_WHISPER_MODEL,
 )
 
 __version__ = "0.1.0"

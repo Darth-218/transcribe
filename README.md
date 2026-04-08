@@ -11,45 +11,38 @@ This project provides a Nix flake with a development shell for transcribing mixe
 
 - Nix with flakes enabled
 - Python 3.11+
-- HuggingFace account with access token
 
-## Setup
+## First-Time Setup (One-time, requires HF_TOKEN)
 
-### 1. Enter the development shell
+On first entry, models are automatically downloaded. You need a HuggingFace token:
 
 ```bash
+# Get token from https://huggingface.co/settings/tokens
+# Must accept terms for:
+#   - pyannote/segmentation-3.0
+#   - pyannote/speaker-diarization-3.1
+
+export HF_TOKEN=your_huggingface_token_here
 nix develop
 ```
 
-### 2. Set your HuggingFace token
+The shell will automatically download models to `./models/` on first run.
+
+## Normal Usage (No token needed after setup)
 
 ```bash
-export HF_TOKEN=your_huggingface_token_here
+nix develop
+python -m transcribe audio.wav
 ```
 
-To get a token:
-1. Go to https://huggingface.co/settings/tokens
-2. Create a new token with "Read" permissions
-3. Accept the terms for:
-   - `pyannote/segmentation-3.0`
-   - `pyannote/speaker-diarization-3.1`
-
-## Usage
-
-### Command-line
+### Command-line Options
 
 ```bash
-# Using module invocation (recommended)
+# Basic usage
 python -m transcribe audio.wav
 
-# Using CLI directly
-transcribe/cli.py audio.wav
-
-# With custom output file
+# Custom output file
 python -m transcribe audio.wav -o output.txt
-
-# With custom model
-python -m transcribe audio.wav --model oddadmix/MasriSwitch-Gemma3n-Transcriber-v1
 
 # Show help
 python -m transcribe --help
@@ -66,10 +59,29 @@ optional arguments:
   --fallback-model      Fallback model (default: MohamedRashad/Arabic-Whisper-CodeSwitching-Edition)
   --language            Language code (default: ar for Arabic)
   --chunk-duration      Chunk duration in seconds for long audio (default: 1800 = 30 min)
-  --output, -o          Output file path
+  --output, -o         Output file path
 ```
 
-### Python API
+## Offline Mode
+
+After initial setup, no internet or HF_TOKEN required:
+
+```bash
+# Without HF_TOKEN
+nix develop
+
+# Works offline using cached models
+python -m transcribe audio.wav
+```
+
+To re-download fresh models:
+```bash
+rm -rf models/
+export HF_TOKEN=your_token
+nix develop  # Will re-download
+```
+
+## Python API
 
 ```python
 from transcribe import (
@@ -86,7 +98,7 @@ from transcribe import (
 
 device = get_device()
 model = load_whisper_with_fallback(device)
-pipeline = load_diarization_pipeline("your_hf_token")
+pipeline = load_diarization_pipeline()  # Works offline if models cached
 
 # Transcribe
 transcript_segments, info = transcribe_audio(model, "audio.wav")
@@ -122,18 +134,19 @@ transcribe/
 ├── __init__.py       # Public API exports
 ├── __main__.py       # python -m transcribe entry point
 ├── cli.py            # CLI argument parsing
-├── models.py        # Whisper model loading
-├── diarization.py   # pyannote pipeline
-├── audio.py         # audio loading and chunking
-├── alignment.py     # merge transcripts with speakers
-└── output.py        # formatting and file output
+├── models.py         # Whisper model loading
+├── diarization.py    # pyannote pipeline
+├── audio.py          # audio loading and chunking
+├── alignment.py       # merge transcripts with speakers
+├── output.py         # formatting and file output
+└── download.py       # model download utilities
 ```
 
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HF_TOKEN` | Yes | HuggingFace token for model access |
+| `HF_TOKEN` | First time only | HuggingFace token for model download |
 
 ## Long Audio Handling
 

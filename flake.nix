@@ -34,6 +34,22 @@
         ];
 
         shellHook = ''
+          # Check and download models if needed
+          if [ ! -d "models/whisper" ] || [ ! -d "models/pyannote" ]; then
+            if [ -n "$HF_TOKEN" ]; then
+              echo "=========================================="
+              echo "Models not found. Downloading..."
+              echo "=========================================="
+              python -c "from transcribe.download import download_all; download_all('./models', '$HF_TOKEN')"
+            else
+              echo "=========================================="
+              echo "WARNING: Models not found!"
+              echo "Set HF_TOKEN and re-enter to download."
+              echo "=========================================="
+            fi
+          fi
+
+          echo ""
           echo "=========================================="
           echo "Arabic-English Audio Transcription Shell"
           echo "=========================================="
@@ -45,8 +61,9 @@
           echo "  - pyannote.audio: $(python -c 'import pyannote.audio; print(pyannote.audio.__version__ if hasattr(pyannote.audio, "__version__") else "installed")')"
           echo "  - ffmpeg: $(ffmpeg -version | head -1)"
           echo ""
-          echo "Required environment variables:"
-          echo "  - HF_TOKEN: HuggingFace token for model access"
+          echo "Models:"
+          echo "  - Location: ./models/"
+          echo "  - Offline ready: $([ -d 'models/whisper' ] && [ -d 'models/pyannote' ] && echo 'Yes' || echo 'No')"
           echo ""
           echo "Usage:"
           echo "  python -m transcribe <audio_file>"
