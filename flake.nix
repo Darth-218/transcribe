@@ -26,6 +26,8 @@
               numpy
               scipy
               huggingface-hub
+              pytest
+              pytest-mock
             ]
           ))
 
