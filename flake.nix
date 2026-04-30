@@ -28,6 +28,7 @@
               huggingface-hub
               pytest
               pytest-mock
+              tqdm
             ]
           ))
 

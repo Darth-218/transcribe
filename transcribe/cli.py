@@ -5,6 +5,7 @@ import argparse
 import os
 import sys
 
+from tqdm import tqdm
 from transcribe import models, diarization, audio, alignment, output
 from transcribe.models import DEFAULT_MODEL, FALLBACK_MODEL
 
@@ -66,14 +67,12 @@ Environment:
         print("Please set: export HF_TOKEN=your_huggingface_token", file=sys.stderr)
         sys.exit(1)
     
-    print("=" * 60, file=sys.stderr)
     print("Arabic-English Audio Transcription with Speaker Diarization", file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
     
     device = models.get_device()
     print(f"Using device: {device}", file=sys.stderr)
     
-    print(f"Primary model: {args.model}", file=sys.stderr)
+    print("Loading models...", file=sys.stderr)
     model = models.load_whisper_with_fallback(
         device,
         primary=args.model,
@@ -92,17 +91,28 @@ Environment:
     chunks = audio.split_audio_chunks(audio_file, args.chunk_duration)
     
     if len(chunks) == 1:
-        print("Processing single audio file...", file=sys.stderr)
-        transcript_segments, _ = audio.transcribe_audio(model, audio_file, args.language)
-        diarization_segments = diarization.run_diarization(pipeline, audio_file)
+        with tqdm(desc="Transcribing audio", unit="seg", file=sys.stderr) as pbar:
+            transcript_segments, _ = audio.transcribe_audio(model, audio_file, args.language)
+            pbar.total = len(transcript_segments)
+            pbar.update(len(transcript_segments))
+            pbar.set_postfix({"segments": len(transcript_segments)})
+        
+        with tqdm(desc="Running diarization", unit="turn", file=sys.stderr) as pbar:
+            diarization_segments = diarization.run_diarization(pipeline, audio_file)
+            pbar.update(1)
+            pbar.set_postfix({"turns": len(diarization_segments)})
+        
         merged = alignment.merge_transcript_and_diarization(transcript_segments, diarization_segments)
     else:
-        print(f"Processing {len(chunks)} chunks for long audio...", file=sys.stderr)
-        all_merged = []
-        for start, end, path in chunks:
-            chunk_result = audio.process_chunk(model, pipeline, path, start, end)
-            all_merged.extend(chunk_result)
-        merged = all_merged
+        with tqdm(desc="Processing chunks", unit="chunk", file=sys.stderr) as pbar:
+            pbar.total = len(chunks)
+            all_merged = []
+            for start, end, path in chunks:
+                chunk_result = audio.process_chunk(model, pipeline, path, start, end)
+                all_merged.extend(chunk_result)
+                pbar.update(1)
+                pbar.set_postfix({"processed": len(all_merged)})
+            merged = all_merged
     
     if not merged:
         print("Error: No transcription output", file=sys.stderr)

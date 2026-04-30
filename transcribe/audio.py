@@ -6,6 +6,7 @@ import tempfile
 from typing import List, Tuple
 
 import numpy as np
+from tqdm import tqdm
 
 
 def get_audio_duration(audio_path: str) -> float:
@@ -72,8 +73,6 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
     from transcribe.diarization import run_diarization
     from transcribe.alignment import merge_transcript_and_diarization
     
-    print(f"Processing chunk: {start_time:.1f}s to {end_time:.1f}s", file=sys.stderr)
-    
     y, sr = librosa.load(audio_path, sr=16000, offset=start_time, duration=end_time - start_time)
     
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
@@ -114,8 +113,6 @@ def transcribe_audio(model, audio_path: str, language: str = "ar") -> tuple:
     Returns:
         Tuple of (transcript_segments list, info object)
     """
-    print(f"Transcribing: {audio_path}", file=sys.stderr)
-    
     try:
         segments, info = model.transcribe(
             audio_path,
@@ -133,7 +130,6 @@ def transcribe_audio(model, audio_path: str, language: str = "ar") -> tuple:
                 "text": seg.text.strip()
             })
         
-        print(f"Transcribed {len(transcript_segments)} segments", file=sys.stderr)
         return transcript_segments, info
     except Exception as e:
         print(f"Transcription failed: {e}", file=sys.stderr)
