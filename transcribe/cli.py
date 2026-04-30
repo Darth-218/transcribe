@@ -4,6 +4,12 @@
 import argparse
 import os
 import sys
+import warnings
+
+# Suppress third-party warnings that are harmless but noisy
+warnings.filterwarnings("ignore", "The MPEG_LAYER_III")
+warnings.filterwarnings("ignore", "degrees of freedom")
+warnings.filterwarnings("ignore", "std(): degrees of freedom")
 
 from tqdm import tqdm
 from transcribe import models, diarization, audio, alignment, output
