@@ -14,17 +14,21 @@ python -m transcribe /path/to/mentorship_session.mp3
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--model` | - | `large-v3` | Whisper model size |
-| `--fallback-model` | - | `medium` | Fallback model if primary fails |
+| `--model` | - | `medium` | Whisper model size |
+| `--fallback-model` | - | `small` | Fallback model if primary fails |
 | `--language` | - | `ar` | Language code (ar=Arabic, en=English) |
 | `--chunk-duration` | - | `1800` | Chunk size in seconds (30 min) |
 | `--output` | `-o` | auto | Output file path |
+| `--transcription-only` | `-t` | False | Skip diarization, show timestamps |
 
 ### Examples
 
 ```bash
-# Basic transcription
+# Full pipeline (transcription + diarization)
 python -m transcribe mentorship_session.wav
+
+# Transcription only (no diarization, no HF_TOKEN needed)
+python -m transcribe audio.wav -t
 
 # With custom output file
 python -m transcribe audio.wav -o my_transcript.txt
@@ -41,14 +45,22 @@ python -m transcribe --help
 
 ## Output
 
-### Console Output
+### Full Pipeline Output
 
-The script outputs formatted transcript to stdout:
-
+Speaker labels with text:
 ```
 SPEAKER_00: مرحباً بك في جلسة الإرشاد
 SPEAKER_01: Thank you for joining us today
 SPEAKER_00: كيف يمكنني مساعدتك
+```
+
+### Transcription-Only Output (`-t` flag)
+
+Timestamps with text:
+```
+[00:00 - 00:05] مرحباً بك في جلسة الإرشاد
+[00:05 - 00:10] Thank you for joining us today
+[00:10 - 00:15] كيف يمكنني مساعدتك
 ```
 
 ### File Output
@@ -61,7 +73,7 @@ Transcript is saved to:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `HF_TOKEN` | First time only | HuggingFace token for model download |
+| `HF_TOKEN` | Diarization only | HuggingFace token (not needed with `-t` flag) |
 
 ### Setting the Token
 
@@ -118,11 +130,17 @@ Supported formats (via ffmpeg):
 
 ### Error: HF_TOKEN required
 
-You need to set `HF_TOKEN` for first-time model download:
+You need to set `HF_TOKEN` for diarization mode:
 
 ```bash
 export HF_TOKEN=your_token
 nix develop
+```
+
+Or use transcription-only mode:
+
+```bash
+python -m transcribe audio.wav -t
 ```
 
 ### Error: No transcription output
@@ -136,5 +154,5 @@ Check that:
 
 Try:
 - Using GPU: Ensure CUDA is available
-- Smaller model: `--model medium` instead of `large-v3`
+- Smaller model: `--model small` instead of `medium`
 - Shorter chunks: `--chunk-duration 600`
