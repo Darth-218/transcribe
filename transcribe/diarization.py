@@ -68,8 +68,7 @@ def load_diarization_pipeline(
             try:
                 pipeline = Pipeline.from_pretrained(
                     "pyannote/speaker-diarization-3.1",
-                    local_files_only=True,
-                    local_dir=str(diarization_dir)
+                    cache_dir=str(local_models)
                 )
                 
                 if torch.cuda.is_available():
