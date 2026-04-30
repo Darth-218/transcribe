@@ -104,7 +104,6 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
     """
     import soundfile as sf
     
-    from transcribe.models import transcribe_audio
     from transcribe.diarization import run_diarization
     from transcribe.alignment import merge_transcript_and_diarization
     
