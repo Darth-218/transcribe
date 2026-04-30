@@ -1,16 +1,16 @@
 """Audio loading and chunking utilities."""
 
+import subprocess
 import sys
 import os
 import tempfile
 from typing import List, Tuple
 
 import numpy as np
-from tqdm import tqdm
 
 
 def get_audio_duration(audio_path: str) -> float:
-    """Get audio file duration in seconds.
+    """Get audio file duration in seconds using ffprobe.
     
     Args:
         audio_path: Path to audio file
@@ -18,13 +18,18 @@ def get_audio_duration(audio_path: str) -> float:
     Returns:
         Duration in seconds
     """
+    result = subprocess.run([
+        "ffprobe", "-v", "quiet",
+        "-show_entries", "format=duration",
+        "-of", "csv=p=0",
+        audio_path
+    ], capture_output=True, text=True)
+    
     try:
-        import soundfile as sf
-        info = sf.info(audio_path)
-        return info.duration
-    except Exception:
-        import librosa
-        return librosa.get_duration(path=audio_path)
+        duration = float(result.stdout.strip())
+        return duration
+    except ValueError:
+        return 0.0
 
 
 def split_audio_chunks(audio_path: str, chunk_duration: int = 1800) -> List[Tuple[float, float, str]]:
@@ -53,6 +58,37 @@ def split_audio_chunks(audio_path: str, chunk_duration: int = 1800) -> List[Tupl
     return chunks
 
 
+def load_audio_chunk(audio_path: str, start_time: float, end_time: float, sr: int = 16000) -> tuple:
+    """Load audio chunk using ffmpeg directly.
+    
+    This avoids librosa/soundfile MP3 warnings.
+    
+    Args:
+        audio_path: Path to audio file
+        start_time: Start time in seconds
+        end_time: End time in seconds
+        sr: Sample rate (default: 16000)
+    
+    Returns:
+        Tuple of (audio array, sample rate)
+    """
+    duration = end_time - start_time
+    
+    result = subprocess.run([
+        "ffmpeg", "-i", audio_path,
+        "-f", "f32le",
+        "-ar", str(sr),
+        "-ac", "1",
+        "-ss", str(start_time),
+        "-t", str(duration),
+        "-loglevel", "quiet",
+        "pipe:1"
+    ], capture_output=True)
+    
+    audio = np.frombuffer(result.stdout, dtype=np.float32)
+    return audio, sr
+
+
 def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time: float) -> List[dict]:
     """Process a single chunk of audio.
     
@@ -66,14 +102,13 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
     Returns:
         List of merged transcript segments with speaker labels
     """
-    import librosa
     import soundfile as sf
     
     from transcribe.models import transcribe_audio
     from transcribe.diarization import run_diarization
     from transcribe.alignment import merge_transcript_and_diarization
     
-    y, sr = librosa.load(audio_path, sr=16000, offset=start_time, duration=end_time - start_time)
+    y, sr = load_audio_chunk(audio_path, start_time, end_time, sr=16000)
     
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
         tmp_path = tmp.name
