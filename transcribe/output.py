@@ -4,29 +4,51 @@ import sys
 from typing import List
 
 
-def format_transcript(merged_segments: List[dict]) -> str:
+def format_time(seconds: float) -> str:
+    """Format seconds as MM:SS timestamp.
+    
+    Args:
+        seconds: Time in seconds
+    
+    Returns:
+        Formatted timestamp string (e.g., "02:35")
+    """
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins:02d}:{secs:02d}"
+
+
+def format_transcript(merged_segments: List[dict], transcription_only: bool = False) -> str:
     """Format merged segments as human-readable transcript.
     
     Args:
-        merged_segments: List of dicts with 'speaker' and 'text' keys
+        merged_segments: List of dicts with 'speaker'/'start'/'end'/'text' keys
+        transcription_only: If True, show timestamps instead of speaker labels
     
     Returns:
         Formatted transcript string
     """
     lines = []
     
-    current_speaker = None
-    for seg in merged_segments:
-        speaker = seg["speaker"]
-        text = seg["text"]
-        
-        if speaker != current_speaker:
-            if current_speaker is not None:
-                lines.append("")
-            lines.append(f"{speaker}: {text}")
-            current_speaker = speaker
-        else:
-            lines.append(text)
+    if transcription_only:
+        for seg in merged_segments:
+            start_time = format_time(seg.get("start", 0))
+            end_time = format_time(seg.get("end", 0))
+            text = seg["text"]
+            lines.append(f"[{start_time} - {end_time}] {text}")
+    else:
+        current_speaker = None
+        for seg in merged_segments:
+            speaker = seg["speaker"]
+            text = seg["text"]
+            
+            if speaker != current_speaker:
+                if current_speaker is not None:
+                    lines.append("")
+                lines.append(f"{speaker}: {text}")
+                current_speaker = speaker
+            else:
+                lines.append(text)
     
     return "\n".join(lines)
 

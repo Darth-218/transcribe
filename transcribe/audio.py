@@ -118,7 +118,10 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
     try:
         transcript_segments = list(transcribe_audio(model, tmp_path))
         
-        diarization_segments = run_diarization(pipeline, tmp_path)
+        if pipeline is not None:
+            diarization_segments = run_diarization(pipeline, tmp_path)
+        else:
+            diarization_segments = []
         
         offset = start_time
         for seg in transcript_segments:

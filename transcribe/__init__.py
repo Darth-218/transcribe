@@ -33,6 +33,7 @@ from transcribe.alignment import (
 )
 from transcribe.output import (
     format_transcript,
+    format_time,
     save_transcript,
     get_output_path,
 )
