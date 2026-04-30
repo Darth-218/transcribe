@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Optional, List
 
-DEFAULT_WHISPER_MODEL = "openai/whisper-small"
+DEFAULT_WHISPER_MODEL = "openai/whisper-medium"
 DIARIZATION_MODEL = "pyannote/speaker-diarization-3.1"
 SEGMENTATION_MODEL = "pyannote/segmentation-3.0"
 

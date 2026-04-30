@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_MODEL = "large-v3"
-FALLBACK_MODEL = "medium"
+DEFAULT_MODEL = "medium"
+FALLBACK_MODEL = "small"
 DEFAULT_MODELS_DIR = "./models"
 
 WHISPER_REQUIRED_FILES = [
