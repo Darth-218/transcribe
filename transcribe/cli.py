@@ -98,10 +98,10 @@ Environment:
     
     if len(chunks) == 1:
         with tqdm(desc="Transcribing audio", unit="seg", file=sys.stderr) as pbar:
-            transcript_segments, _ = audio.transcribe_audio(model, audio_file, args.language)
-            pbar.total = len(transcript_segments)
-            pbar.update(len(transcript_segments))
-            pbar.set_postfix({"segments": len(transcript_segments)})
+            transcript_segments = []
+            for segment in audio.transcribe_audio(model, audio_file, args.language):
+                transcript_segments.append(segment)
+                pbar.update(1)
         
         with tqdm(desc="Running diarization", unit="turn", file=sys.stderr) as pbar:
             diarization_segments = diarization.run_diarization(pipeline, audio_file)

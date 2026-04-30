@@ -4,7 +4,7 @@ import subprocess
 import sys
 import os
 import tempfile
-from typing import List, Tuple
+from typing import List, Tuple, Generator, Any
 
 import numpy as np
 
@@ -116,7 +116,7 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
     sf.write(tmp_path, y, sr)
     
     try:
-        transcript_segments, _ = transcribe_audio(model, tmp_path)
+        transcript_segments = list(transcribe_audio(model, tmp_path))
         
         diarization_segments = run_diarization(pipeline, tmp_path)
         
@@ -137,16 +137,18 @@ def process_chunk(model, pipeline, audio_path: str, start_time: float, end_time:
             os.remove(tmp_path)
 
 
-def transcribe_audio(model, audio_path: str, language: str = "ar") -> tuple:
-    """Transcribe audio file using faster-whisper.
+def transcribe_audio(model, audio_path: str, language: str = "ar") -> Generator[dict, None, None]:
+    """Transcribe audio file using faster-whisper as a generator.
+    
+    Yields segments as they are processed for real-time progress updates.
     
     Args:
         model: Loaded WhisperModel
         audio_path: Path to audio file
         language: Language code (default: ar for Arabic)
     
-    Returns:
-        Tuple of (transcript_segments list, info object)
+    Yields:
+        dict with 'start', 'end', 'text' keys for each segment
     """
     try:
         segments, info = model.transcribe(
@@ -157,15 +159,11 @@ def transcribe_audio(model, audio_path: str, language: str = "ar") -> tuple:
             vad_parameters=dict(min_silence_duration_ms=500)
         )
         
-        transcript_segments = []
         for seg in segments:
-            transcript_segments.append({
+            yield {
                 "start": seg.start,
                 "end": seg.end,
                 "text": seg.text.strip()
-            })
-        
-        return transcript_segments, info
+            }
     except Exception as e:
         print(f"Transcription failed: {e}", file=sys.stderr)
-        return [], None
