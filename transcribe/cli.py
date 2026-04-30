@@ -4,6 +4,7 @@
 import argparse
 import os
 import sys
+import tempfile
 import warnings
 
 # Suppress third-party warnings that are harmless but noisy
@@ -14,6 +15,55 @@ warnings.filterwarnings("ignore", "std(): degrees of freedom")
 from tqdm import tqdm
 from transcribe import models, diarization, audio, alignment, output
 from transcribe.models import DEFAULT_MODEL, FALLBACK_MODEL
+
+
+def process_chunk_realtime(model, pipeline, audio_path, start_time, end_time, pbar, transcription_only=False):
+    """Process a single chunk with real-time segment progress updates.
+    
+    Args:
+        model: Whisper model
+        pipeline: Diarization pipeline (None if transcription_only)
+        audio_path: Path to audio file
+        start_time: Start time in seconds
+        end_time: End time in seconds
+        pbar: tqdm progress bar to update
+        transcription_only: If True, skip diarization
+    
+    Returns:
+        List of merged transcript segments
+    """
+    import soundfile as sf
+    
+    y, sr = audio.load_audio_chunk(audio_path, start_time, end_time, sr=16000)
+    
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+        tmp_path = tmp.name
+    
+    sf.write(tmp_path, y, sr)
+    
+    try:
+        transcript_segments = []
+        for segment in audio.transcribe_audio(model, tmp_path):
+            segment["start"] += start_time
+            segment["end"] += start_time
+            transcript_segments.append(segment)
+            pbar.update(1)
+        
+        if not transcription_only and pipeline is not None:
+            diarization_segments = diarization.run_diarization(pipeline, tmp_path)
+            
+            for dia in diarization_segments:
+                dia["start"] += start_time
+                dia["end"] += start_time
+            
+            merged = alignment.merge_transcript_and_diarization(transcript_segments, diarization_segments)
+        else:
+            merged = transcript_segments
+        
+        return merged
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 def main():
@@ -56,8 +106,8 @@ Environment:
     parser.add_argument(
         "--chunk-duration",
         type=int,
-        default=1800,
-        help="Chunk duration in seconds for long audio (default: 1800 = 30 min)"
+        default=300,
+        help="Chunk duration in seconds for long audio (default: 300 = 5 min)"
     )
     parser.add_argument(
         "--output", "-o",
@@ -93,30 +143,8 @@ Environment:
         print("Error: Failed to load both primary and fallback models", file=sys.stderr)
         sys.exit(1)
     
-    if args.transcription_only:
-        print("Mode: Transcription only (no diarization)", file=sys.stderr)
-        
-        chunks = audio.split_audio_chunks(audio_file, args.chunk_duration)
-        
-        if len(chunks) == 1:
-            with tqdm(desc="Transcribing (no diarization)", unit="seg", file=sys.stderr) as pbar:
-                transcript_segments = []
-                for segment in audio.transcribe_audio(model, audio_file, args.language):
-                    transcript_segments.append(segment)
-                    pbar.update(1)
-            
-            merged = transcript_segments
-        else:
-            with tqdm(desc="Processing chunks", unit="chunk", file=sys.stderr) as pbar:
-                pbar.total = len(chunks)
-                all_merged = []
-                for start, end, path in chunks:
-                    chunk_result = audio.process_chunk(model, None, path, start, end)
-                    all_merged.extend(chunk_result)
-                    pbar.update(1)
-                    pbar.set_postfix({"processed": len(all_merged)})
-                merged = all_merged
-    else:
+    pipeline = None
+    if not args.transcription_only:
         print("Mode: Transcription + Diarization", file=sys.stderr)
         
         hf_token = os.environ.get("HF_TOKEN")
@@ -130,32 +158,39 @@ Environment:
         if pipeline is None:
             print("Error: Failed to load diarization pipeline", file=sys.stderr)
             sys.exit(1)
+    else:
+        print("Mode: Transcription only (no diarization)", file=sys.stderr)
+    
+    chunks = audio.split_audio_chunks(audio_file, args.chunk_duration)
+    
+    if len(chunks) == 1:
+        desc = "Transcribing (no diarization)" if args.transcription_only else "Transcribing audio"
+        with tqdm(desc=desc, unit="seg", file=sys.stderr) as pbar:
+            transcript_segments = []
+            for segment in audio.transcribe_audio(model, audio_file, args.language):
+                transcript_segments.append(segment)
+                pbar.update(1)
         
-        chunks = audio.split_audio_chunks(audio_file, args.chunk_duration)
-        
-        if len(chunks) == 1:
-            with tqdm(desc="Transcribing audio", unit="seg", file=sys.stderr) as pbar:
-                transcript_segments = []
-                for segment in audio.transcribe_audio(model, audio_file, args.language):
-                    transcript_segments.append(segment)
-                    pbar.update(1)
-            
+        if args.transcription_only:
+            merged = transcript_segments
+        else:
             with tqdm(desc="Running diarization", unit="turn", file=sys.stderr) as pbar:
                 diarization_segments = diarization.run_diarization(pipeline, audio_file)
                 pbar.update(1)
                 pbar.set_postfix({"turns": len(diarization_segments)})
             
             merged = alignment.merge_transcript_and_diarization(transcript_segments, diarization_segments)
-        else:
-            with tqdm(desc="Processing chunks", unit="chunk", file=sys.stderr) as pbar:
-                pbar.total = len(chunks)
-                all_merged = []
-                for start, end, path in chunks:
-                    chunk_result = audio.process_chunk(model, pipeline, path, start, end)
-                    all_merged.extend(chunk_result)
-                    pbar.update(1)
-                    pbar.set_postfix({"processed": len(all_merged)})
-                merged = all_merged
+    else:
+        with tqdm(desc="Processing chunks", unit="seg", file=sys.stderr) as pbar:
+            all_merged = []
+            for i, (start, end, path) in enumerate(chunks):
+                pbar.set_description(f"Chunk {i+1}/{len(chunks)}")
+                chunk_result = process_chunk_realtime(
+                    model, pipeline, path, start, end, pbar,
+                    transcription_only=args.transcription_only
+                )
+                all_merged.extend(chunk_result)
+            merged = all_merged
     
     if not merged:
         print("Error: No transcription output", file=sys.stderr)
